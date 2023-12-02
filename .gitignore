@@ -1,0 +1,7 @@
+**/obj/
+.vs/
+**/bin
+*.pdf
+*.exe
+packages/
+*.dll

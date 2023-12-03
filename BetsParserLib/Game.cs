@@ -6,6 +6,8 @@ using Serilog;
 using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.CompilerServices;
+using System.Collections.ObjectModel;
+using OpenQA.Selenium.DevTools.V117.Debugger;
 
 namespace BetsParserLib
 {
@@ -20,166 +22,121 @@ namespace BetsParserLib
 
     public class Game
     {
+        /// <summary>
+        /// Название лиги
+        /// </summary>
         public string LeagueName { get; set; }
+        /// <summary>
+        /// Название игры
+        /// </summary>
         public string Name { get; set; }
+        /// <summary>
+        /// Дата игры
+        /// </summary>
         public string Date { get; set; }
+        /// <summary>
+        /// Результат игры
+        /// </summary>
         public string Result { get; set; }
-        public List<Forecast> Forecasts { get; set; } = new List<Forecast>();
+        /// <summary>
+        /// Коэффициенты игры
+        /// </summary>
+        public List<BookmakerGameKoeff> BookmakersRows { get; set; } = new List<BookmakerGameKoeff>();
+        /// <summary>
+        /// Ссылка на страницу игры
+        /// </summary>
         public string Reference { get; set; }
 
-        private static IWebElement? GetElementIfExist(IWebElement webElement, string className)
+        /// <summary>
+        /// Возвращает список игр в заданную дату.
+        /// </summary>
+        /// <param name="date"></param>
+        /// <param name="progress"></param>
+        /// <param name="token"></param>
+        /// <returns></returns>
+        public static List<Game> GetGames(DateTime date, IProgress<LoadingProgress> progress, CancellationToken token)
         {
-            if (webElement.FindElements(By.ClassName(className)).Count > 0)
-                return webElement.FindElement(By.ClassName(className));
-
-            return null;
-        }
-
-        public static List<Game> GetGames(DateTime date, IProgress<LoadingProgress> progress)
-        {
+            // Инициализация
             Log.Logger = new LoggerConfiguration()
                     .WriteTo.Console()
                     .WriteTo.File(path: $"logs\\Log.txt", rollingInterval: RollingInterval.Day)
                     .CreateLogger();
-
             var chromeOptions = new ChromeOptions();
             chromeOptions.AddArguments("headless");
+            var CurrentProgress = new LoadingProgress();
 
             using (var driver = new ChromeDriver(chromeOptions))
             {
-                var gamePageUrl = $"https://www.betexplorer.com/hockey/results/?year=2023&month={date.Month}&day={date.Day}";
-                driver.Url = gamePageUrl;
-
-                var CurrentProgress = new LoadingProgress() { LoadingObjectName = "Загрузка списка игр..." };
-                progress.Report(CurrentProgress);
-
-                Thread.Sleep(1000); // ожидание окончания загрузки страницы!
-
-                var acceptCookiesBtn = driver.FindElement(By.XPath("//*[@id='onetrust-accept-btn-handler']"));
-                acceptCookiesBtn.Click(); // закрываем окно кукесов
-
-                IWebElement rootTable = driver.FindElement(By.XPath("//*[@id=\"nr-all\"]/div[3]/div/table"));
-                var children = rootTable.FindElements(By.XPath(".//tbody")); // получаем список игр
+                LoadGamesList(date, progress, CurrentProgress, driver);
+                CloseCookiesWindow(driver);
+                ReadOnlyCollection<IWebElement> leaguesElements = GetLeaguesRowsElements(driver);
 
                 var games = new List<Game>();
-                foreach (var child in children)
+                foreach (var leagueElement in leaguesElements)
                 {
-                    var leagueName = string.Empty;
-                    try
+                    string leagueName = GetLeagueName(leagueElement);
+                    var gamesElements = leagueElement.FindElements(By.XPath(".//tr")).ToList(); // список матчей лиги
+                    for (int i = 1; i < gamesElements.Count; i++) // начинаем со второго элемента
                     {
-                        leagueName = child.FindElement(By.XPath(".//tr[1]/th[1]/a")).Text;
-                    }
-                    catch (Exception ex)
-                    {
-                        Log.Logger.Error("Не удалось прочитать название лиги. " + ex.Message);
-                    }
+                        if (token.IsCancellationRequested)
+                            return new List<Game>();
 
-                    var matchesElements = child.FindElements(By.XPath(".//tr")).ToList(); // список матчей лиги
-                    for (int i = 1; i < matchesElements.Count; i++)
-                    {
-                        var debugStr = string.Empty;
-                        try
-                        {
-                            var game = new Game();
-                            var mainElement = GetElementIfExist(matchesElements[i], "table-main__tt");
-                            game.Name = mainElement?.FindElement(By.XPath(".//a")).Text;
-                            debugStr += $"Name {game.Name} ";
-                            game.Result = GetElementIfExist(matchesElements[i], "table-main__result")?.FindElement(By.XPath(".//a")).Text;
-                            debugStr += $"Result {game.Result} ";
-                            game.Date = date.ToString("d");
-                            debugStr += $"Date {game.Date} ";
-                            game.Reference = mainElement?.FindElement(By.XPath(".//a")).GetAttribute("href");
-                            debugStr += $"Reference {game.Reference} ";
-                            game.LeagueName = leagueName;
+                        var gameElement = gamesElements[i];
+                        Game game = ReadGame(date, leagueName, gameElement);
+                        if (game != null)
                             games.Add(game);
-                        }
-                        catch(Exception ex)
-                        {
-                            Log.Logger.Error($"Не удалось прочитать чать параметров матча: {debugStr}. " + ex.Message);
-                        }
                     }
                 }
 
                 Thread.Sleep(100);
-                for(int i = 0; i < games.Count; i++)
+                for (int i = 0; i < games.Count; i++)
                 {
-                    var game = games[i];
+                    if (token.IsCancellationRequested)
+                        break;
 
-                    Log.Logger.Information($"Парсим игру: {game.Name}");
+                    var game = games[i];
+                    Log.Logger.Information($"Начинаем парсить игру: {game.Name}");
 
                     CurrentProgress.LoadingObjectName = game.Name;
                     CurrentProgress.GamesCount = games.Count;
                     progress.Report(CurrentProgress);
 
-                    game.Forecasts = game.GetForecasts(driver, game, progress, CurrentProgress);
+                    game.BookmakersRows = game.GetBookmakersRows(driver, game, progress, CurrentProgress, token);
 
                     CurrentProgress.GamesLoaded = (i + 1);
                     progress.Report(CurrentProgress);
-
                 }
 
                 return games;
             }
         }
 
-        public List<Forecast> GetForecasts(
-            ChromeDriver driver, Game game, IProgress<LoadingProgress> progress, LoadingProgress currentProgress)
+        public List<BookmakerGameKoeff> GetBookmakersRows(
+            ChromeDriver driver, Game game, IProgress<LoadingProgress> progress, LoadingProgress currentProgress, CancellationToken token)
         {
-            List<Forecast> forecasts = new List<Forecast>();
             driver.Url = game.Reference;
 
-            List<IWebElement> blocks;
-            try
+            List<IWebElement> bookmakersElements = GetBookmakersElements(driver);
+            if (bookmakersElements == null)
+                return new List<BookmakerGameKoeff>();
+
+            List<BookmakerGameKoeff> bookmakersRows = new List<BookmakerGameKoeff>();
+            for (int i = 0; i < bookmakersElements.Count; i++)
             {
-                var wait = new WebDriverWait(driver, TimeSpan.FromSeconds(5));
-                wait.Until(drv => drv.FindElements(By.XPath("//*[@id=\"odds-all\"]/div[1]/div/ul/li[3]/a")).ToList().Count() > 0);
-                var over_under = driver.FindElement(By.XPath("//*[@id=\"odds-all\"]/div[1]/div/ul/li[3]/a")); // вкладка Over/Under
-                over_under.Click();
-                Thread.Sleep(1000);
-                var wait1 = new WebDriverWait(driver, TimeSpan.FromSeconds(5));
-                wait1.Until(drv => drv.FindElements(By.Id("odds-preloader")).ToList().Count() > 0);
-                var wait2 = new WebDriverWait(driver, TimeSpan.FromSeconds(5));
-                wait2.Until(drv => drv.FindElement(By.Id("odds-preloader")).GetAttribute("style") == "display: none;");
-                blocks = driver.FindElements(By.XPath("//tr[@data-bid]")).ToList();
-            }
-            catch(Exception ex)
-            {
-                Log.Logger.Error($"Не удалось перейти на вкладку Over/Under. {ex.Message}");
-                return new List<Forecast>();
-            }
+                if (token.IsCancellationRequested)
+                    break;
 
-            for (int i = 0; i < blocks.Count; i++)
-            {
-                var debugStr = string.Empty;
-                try
-                {
-                    var block = blocks[i];
-                    var forecast = new Forecast();
-                    forecast.CompanyName = block.FindElement(By.XPath(".//td[1]/a")).Text;
-                    Log.Logger.Information($"Парсимм коэффициенты: {forecast.CompanyName}");
-                    debugStr += $"CompanyName: {forecast.CompanyName} ";
-                    forecast.Total = double.Parse(block.FindElement(By.ClassName("table-main__doubleparameter")).Text, CultureInfo.InvariantCulture);
-                    debugStr += $"Total: {forecast.Total} ";
-                    
-                    var overElement = block.FindElements(By.XPath(".//td[@data-odd]"))[0];
-                    forecast.Over = GetHistory(driver, overElement);
+                var block = bookmakersElements[i];
+                BookmakerGameKoeff bookmakerRow = ReadBoolmakerRow(driver, block);
 
-                    var underElement = block.FindElements(By.XPath(".//td[@data-odd]"))[1];
-                    forecast.Under = GetHistory(driver, underElement);
+                bookmakersRows.Add(bookmakerRow);
 
-                    forecasts.Add(forecast);
-
-                    currentProgress.ForecastsLoaded = (i + 1);
-                    currentProgress.ForecastsCount = blocks.Count;
-                    progress.Report(currentProgress);
-                }
-                catch(Exception ex)
-                {
-                    Log.Logger.Error($"Не удалось получить параметры {debugStr}. {ex.Message}");
-                }
+                currentProgress.ForecastsLoaded = (i + 1);
+                currentProgress.ForecastsCount = bookmakersElements.Count;
+                progress.Report(currentProgress);
             }
 
-            return forecasts;
+            return bookmakersRows;
         }
 
         public List<HistoryRow> GetHistory(ChromeDriver driver, IWebElement overElement)
@@ -248,58 +205,79 @@ namespace BetsParserLib
             return history.OrderBy(r => r.Date).ToList();
         }
 
-        public int GetExodus(Forecast forecast)
+        public int? GetExodus(BookmakerGameKoeff? forecast)
         {
+            if (forecast == null)
+                return null;
+
             if (Result == null)
-                return -1;
+                return null;
 
             try
             {
-                var first = int.Parse(Result.Split(" ")[0].Split(":")[0], CultureInfo.InvariantCulture);
-                var second = int.Parse(Result.Split(" ")[0].Split(":")[1], CultureInfo.InvariantCulture);
-                var goleCount = first + second;
+                // формат результата:  "2:3" или "2:3 ET" или "2:3 PEN"
+                // на странице матча - ET - "After Extra Time" и PEN - "After Penalties"
+                // в случае ET и PEN вычитаем единицу из числа голов, тк он был забит по пенальти или в доп время.
+                var additionalGole = 0;
+                if (Result.Split(" ").Length > 1)
+                {
+                    var additional = Result.Split(" ")[1];
+                    if (additional.Contains("ET") || additional.Contains("PEN."))
+                        additionalGole = 1;
+                }
+
+                var score = Result.Split(" ")[0];
+                var first = int.Parse(score.Split(":")[0], CultureInfo.InvariantCulture);
+                var second = int.Parse(score.Split(":")[1], CultureInfo.InvariantCulture);
+                var goleCount = first + second - additionalGole;
                 var exodus = (goleCount > forecast.Total) ? 2 : 0;
                 return exodus;
             }
             catch(Exception ex)
             {
-                Log.Logger.Error($"Не удалось получить ИСХОД {forecast.CompanyName}, {forecast.Over}. {ex.Message}");
-                return -1;
+                Log.Logger.Error($"Не удалось получить ИСХОД {forecast.BookmakerName}, {forecast.Over}. {ex.Message}");
+                return null;
             }
         }
 
-        public double GetKoeffStart(Forecast forecast)
+        public double? GetKoeffStart(BookmakerGameKoeff? forecast)
         {
+            if (forecast == null) return null;
+
             return (GetExodus(forecast) == 2) ? forecast.Over.First().Value : forecast.Under.First().Value;
         }
 
-        public string? GetKoeffSecond(Forecast forecast) // второй
+        public double? GetKoeffSecond(BookmakerGameKoeff? forecast) // второй
         {
+            if (forecast == null) return null;
+
             if (GetExodus(forecast) == 2)
             {
                 if (forecast.Over.Count <= 2)
                     return null;
 
-                return forecast.Over[1].Value.ToString();
+                return forecast.Over[1].Value;
             }
             else
             {
                 if (forecast.Under.Count <= 2)
                     return null;
 
-                return forecast.Under[1].Value.ToString();
+                return forecast.Under[1].Value;
             }
         }
 
-        public string? GetKoeffPenultimate(Forecast forecast) // предпоследний
+        public double? GetKoeffPenultimate(BookmakerGameKoeff? forecast) // предпоследний
         {
+            if (forecast == null) return null;
+
             if (GetExodus(forecast) == 2)
             {
                 if (forecast.Over.Count <= 2)
                     return null;
 
                 var penultimateIndex = forecast.Over.Count - 2;
-                return forecast.Over[penultimateIndex].Value.ToString();
+                return forecast.Over[penultimateIndex].Value;
             }
             else
             {
@@ -307,13 +285,139 @@ namespace BetsParserLib
                     return null;
 
                 var penultimateIndex = forecast.Under.Count - 2;
-                return forecast.Under[penultimateIndex].Value.ToString();
+                return forecast.Under[penultimateIndex].Value;
             }
         }
 
-        public double GetKoeffFinal(Forecast forecast)
+        public double? GetKoeffFinal(BookmakerGameKoeff? forecast)
         {
+            if (forecast == null) return null;
+
             return (GetExodus(forecast) == 2) ? forecast.Over.Last().Value : forecast.Under.Last().Value;
+        }
+
+        private BookmakerGameKoeff ReadBoolmakerRow(ChromeDriver driver, IWebElement block)
+        {
+            var bookmakerRow = new BookmakerGameKoeff();
+            var debugStr = string.Empty;
+            try
+            {
+                bookmakerRow.BookmakerName = block.FindElement(By.XPath(".//td[1]/a")).Text;
+                Log.Logger.Information($"Парсим коэффициенты: {bookmakerRow.BookmakerName}");
+                debugStr += $"BookmakerName: {bookmakerRow.BookmakerName} ";
+
+                bookmakerRow.Total = double.Parse(block.FindElement(By.ClassName("table-main__doubleparameter")).Text, CultureInfo.InvariantCulture);
+                debugStr += $"Total: {bookmakerRow.Total} ";
+
+                var overElement = block.FindElements(By.XPath(".//td[@data-odd]"))[0];
+                bookmakerRow.Over = GetHistory(driver, overElement);
+
+                var underElement = block.FindElements(By.XPath(".//td[@data-odd]"))[1];
+                bookmakerRow.Under = GetHistory(driver, underElement);
+            }
+            catch (Exception ex)
+            {
+                Log.Logger.Error($"Не удалось получить параметры {debugStr}. {ex.Message}");
+            }
+
+            return bookmakerRow;
+        }
+
+        private static List<IWebElement> GetBookmakersElements(ChromeDriver driver)
+        {
+            List<IWebElement> blocks = null;
+            try
+            {
+                var wait = new WebDriverWait(driver, TimeSpan.FromSeconds(5));
+                wait.Until(drv => drv.FindElements(By.XPath("//*[@id=\"odds-all\"]/div[1]/div/ul/li[3]/a")).ToList().Count() > 0);
+                var over_under = driver.FindElement(By.XPath("//*[@id=\"odds-all\"]/div[1]/div/ul/li[3]/a")); // вкладка Over/Under
+                over_under.Click();
+                Thread.Sleep(1000);
+                var wait1 = new WebDriverWait(driver, TimeSpan.FromSeconds(5));
+                wait1.Until(drv => drv.FindElements(By.Id("odds-preloader")).ToList().Count() > 0);
+                var wait2 = new WebDriverWait(driver, TimeSpan.FromSeconds(5));
+                wait2.Until(drv => drv.FindElement(By.Id("odds-preloader")).GetAttribute("style") == "display: none;");
+                blocks = driver.FindElements(By.XPath("//tr[@data-bid]")).ToList();
+            }
+            catch (Exception ex)
+            {
+                Log.Logger.Error($"Не удалось перейти на вкладку Over/Under. {ex.Message}");
+                blocks = null;
+            }
+
+            return blocks;
+        }
+
+        private static IWebElement? GetElementIfExist(IWebElement webElement, string className)
+        {
+            if (webElement.FindElements(By.ClassName(className)).Count > 0)
+                return webElement.FindElement(By.ClassName(className));
+
+            return null;
+        }
+
+        private static string GetLeagueName(IWebElement leagueElement)
+        {
+            var leagueName = string.Empty;
+            try
+            {
+                leagueName = leagueElement.FindElement(By.XPath(".//tr[1]/th[1]/a")).Text;
+            }
+            catch (Exception ex)
+            {
+                Log.Logger.Error("Не удалось прочитать название лиги. " + ex.Message);
+            }
+
+            return leagueName;
+        }
+
+        private static Game ReadGame(DateTime date, string leagueName, IWebElement gameElement)
+        {
+            Game game = null;
+            var debugStr = string.Empty;
+            try
+            {
+                game = new Game();
+                var mainElement = GetElementIfExist(gameElement, "table-main__tt");
+                game.Name = mainElement?.FindElement(By.XPath(".//a")).Text;
+                debugStr += $"Name {game.Name} ";
+                game.Result = GetElementIfExist(gameElement, "table-main__result")?.FindElement(By.XPath(".//a")).Text;
+                debugStr += $"Result {game.Result} ";
+                game.Reference = mainElement?.FindElement(By.XPath(".//a")).GetAttribute("href");
+                debugStr += $"Reference {game.Reference} ";
+
+                game.Date = date.ToString("d");
+                game.LeagueName = leagueName;
+            }
+            catch (Exception ex)
+            {
+                Log.Logger.Error($"Не удалось прочитать чать параметров матча: {debugStr}. " + ex.Message);
+                game = null;
+            }
+
+            return game;
+        }
+
+        private static void LoadGamesList(DateTime date, IProgress<LoadingProgress> progress, LoadingProgress CurrentProgress, ChromeDriver driver)
+        {
+            var gamePageUrl = $"https://www.betexplorer.com/hockey/results/?year=2023&month={date.Month}&day={date.Day}";
+            driver.Url = gamePageUrl;
+            CurrentProgress.LoadingObjectName = "Загрузка списка игр...";
+            progress.Report(CurrentProgress);
+            Thread.Sleep(1000); // ожидание окончания загрузки страницы!
+        }
+
+        private static ReadOnlyCollection<IWebElement> GetLeaguesRowsElements(ChromeDriver driver)
+        {
+            IWebElement rootTable = driver.FindElement(By.XPath("//*[@id=\"nr-all\"]/div[3]/div/table"));
+            var children = rootTable.FindElements(By.XPath(".//tbody")); // получаем список игр
+            return children;
+        }
+
+        private static void CloseCookiesWindow(ChromeDriver driver)
+        {
+            var acceptCookiesBtn = driver.FindElement(By.XPath("//*[@id='onetrust-accept-btn-handler']"));
+            acceptCookiesBtn.Click(); // закрываем окно кукесов
         }
     }
 }

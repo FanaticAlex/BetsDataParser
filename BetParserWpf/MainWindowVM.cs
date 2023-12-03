@@ -2,12 +2,14 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using OpenQA.Selenium.DevTools;
+using OpenQA.Selenium.DevTools.V117.Debugger;
 using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -19,11 +21,12 @@ namespace BetParserWpf
         public static string DirectoryNameHistory = "History";
         public static string DirectoryNameFiltered = "Filtered";
 
+        private CancellationTokenSource _cancellationTokenSource;
+
         public MainWindowVM()
         {
             Date = DateTime.Now;
-            ProgressGamesText = $"Игр загружено:";
-            ProgressForecastsText = $"коэффициентов загружено:";
+            ResetProgress();
         }
 
         [ObservableProperty]
@@ -59,9 +62,20 @@ namespace BetParserWpf
                 LoadingObject = p.LoadingObjectName;
             });
 
-            List<Game> games = new List<Game>();
-            await Task.Run(() => games = Game.GetGames(Date, progress));
+            _cancellationTokenSource = new CancellationTokenSource();
 
+            List<Game> games = new List<Game>();
+            await Task.Run(() => games = Game.GetGames(Date, progress, _cancellationTokenSource.Token), _cancellationTokenSource.Token);
+
+            if (CreateDirectories())
+            {
+                var str = BetsHelper.Serialize(games);
+                BetsHelper.SaveToFile(str, $"{DirectoryNameHistory}\\{GetSaveFileName(Date)}");
+            }
+        }
+
+        private static bool CreateDirectories()
+        {
             try
             {
                 if (!Directory.Exists(DirectoryNameHistory))
@@ -69,14 +83,32 @@ namespace BetParserWpf
 
                 if (!Directory.Exists(DirectoryNameFiltered))
                     Directory.CreateDirectory(DirectoryNameFiltered);
-            }
-            catch(Exception ex)
-            {
-                MessageBox.Show($"Не удалось создать директории для сохранения результата. {ex.Message}");
-            }
 
-            BetsHelper.WriteResultsCSV(BetsHelper.Translate(games), $"{DirectoryNameHistory}\\{GetFileName(Date)}");
-            BetsHelper.WriteResultsCSV(BetsHelper.Translate(BetsHelper.Filter(games)), $"{DirectoryNameFiltered}\\filtered_{GetFileName(Date)}");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Не удалось создать директории для сохранения результата. {ex.Message}", "Ошибка");
+                return false;
+            }
+        }
+
+        [RelayCommand]
+        public void SotopLoad()
+        {
+            _cancellationTokenSource.Cancel();
+            MessageBox.Show($"Загрузка отстановлена.");
+
+            ResetProgress();
+        }
+
+        private void ResetProgress()
+        {
+            ProgressGame = 0;
+            ProgressForecast = 0;
+            ProgressGamesText = $"Игр загружено:";
+            ProgressForecastsText = $"коэффициентов загружено:";
+            LoadingObject = string.Empty;
         }
 
         [RelayCommand]
@@ -85,15 +117,29 @@ namespace BetParserWpf
             Process.Start("explorer.exe", $"{AppDomain.CurrentDomain.BaseDirectory}{DirectoryNameHistory}");
         }
 
-        public void CheckIsLoaded()
+        [RelayCommand]
+        public void Filter()
         {
-            IsLoaded = File.Exists($"{AppDomain.CurrentDomain.BaseDirectory}{DirectoryNameHistory}\\{GetFileName(Date)}");
+            var games = BetsHelper.Deserialize($"{DirectoryNameHistory}\\{GetSaveFileName(Date)}");
+            var rows1 = BetsHelper.Translate1(games);
+
+            BetsHelper.WriteResultsCSV(rows1, $"{DirectoryNameFiltered}\\filtered_{GetFilteredFileName(Date)}");
+            Process.Start("explorer.exe", $"{AppDomain.CurrentDomain.BaseDirectory}{DirectoryNameFiltered}");
         }
 
-        public string GetFileName(DateTime date)
+        public void CheckIsLoaded()
+        {
+            IsLoaded = File.Exists($"{AppDomain.CurrentDomain.BaseDirectory}{DirectoryNameHistory}\\{GetSaveFileName(Date)}");
+        }
+
+        public string GetSaveFileName(DateTime date)
+        {
+            return $"{date.ToString("yyyy_MM_dd")}.json";
+        }
+
+        public string GetFilteredFileName(DateTime date)
         {
             return $"{date.ToString("yyyy_MM_dd")}.csv";
         }
-
     }
 }

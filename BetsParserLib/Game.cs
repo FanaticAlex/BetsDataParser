@@ -7,7 +7,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Collections.ObjectModel;
-using OpenQA.Selenium.DevTools.V117.Debugger;
+using Serilog.Core;
 
 namespace BetsParserLib
 {
@@ -58,12 +58,16 @@ namespace BetsParserLib
         {
             // Инициализация
             Log.Logger = new LoggerConfiguration()
+                    .WriteTo.Debug()
                     .WriteTo.Console()
                     .WriteTo.File(path: $"logs\\Log.txt", rollingInterval: RollingInterval.Day)
                     .CreateLogger();
+
             var chromeOptions = new ChromeOptions();
             chromeOptions.AddArguments("headless");
             var CurrentProgress = new LoadingProgress();
+
+            Log.Logger.Information($"Начинаем парсить игры на дату: {date.ToString("d")}");
 
             using (var driver = new ChromeDriver(chromeOptions))
             {
@@ -71,23 +75,37 @@ namespace BetsParserLib
                 CloseCookiesWindow(driver);
                 ReadOnlyCollection<IWebElement> leaguesElements = GetLeaguesRowsElements(driver);
 
+                Log.Logger.Information($"Начинаем парсить список игр в каждой лиге");
                 var games = new List<Game>();
                 foreach (var leagueElement in leaguesElements)
                 {
                     string leagueName = GetLeagueName(leagueElement);
+                    if (leagueName == null)
+                    {
+                        Log.Logger.Information($"Пропускаем строку, тк лига не найдена");
+                        continue;
+                    }
+
+                    Log.Logger.Information($"Начинаем парсить игру лигу {leagueName}");
                     var gamesElements = leagueElement.FindElements(By.XPath(".//tr")).ToList(); // список матчей лиги
+
                     for (int i = 1; i < gamesElements.Count; i++) // начинаем со второго элемента
                     {
                         if (token.IsCancellationRequested)
+                        {
+                            Log.Logger.Information($"Парсинг остановлен.");
                             return new List<Game>();
+                        }
 
                         var gameElement = gamesElements[i];
                         Game game = ReadGame(date, leagueName, gameElement);
+                        Log.Logger.Information($"Игра добавлена в список: {game.Name}");
                         if (game != null)
                             games.Add(game);
                     }
                 }
 
+                // начинаем парсить букмекеров
                 Thread.Sleep(100);
                 for (int i = 0; i < games.Count; i++)
                 {
@@ -152,7 +170,7 @@ namespace BetsParserLib
             }
             catch(Exception ex )
             {
-                Log.Logger.Error($"Не удалось получить навести курсор на историю коэффициентов. {ex.Message}");
+                Log.Logger.Error(ex, $"Нет элеммента истории коэффициентов. {ex.Message}");
                 return new List<HistoryRow>(); ;
             }
 
@@ -182,7 +200,7 @@ namespace BetsParserLib
                         }
                         catch(Exception ex)
                         {
-                            Log.Logger.Error($"Не удалось получить историю коээфициентов: {debugStr}. {ex.Message}");
+                            Log.Logger.Error(ex, $"Не удалось получить историю коээфициентов: {debugStr}. {ex.Message}");
                         }
                     }
                 }
@@ -198,7 +216,7 @@ namespace BetsParserLib
                 }
                 catch(Exception ex)
                 {
-                    Log.Logger.Error($"Не удалось получить коэффициент без истории. {ex.Message}");
+                    Log.Logger.Error(ex, $"Не удалось получить коэффициент без истории. {ex.Message}");
                 }
             }
 
@@ -235,65 +253,113 @@ namespace BetsParserLib
             }
             catch(Exception ex)
             {
-                Log.Logger.Error($"Не удалось получить ИСХОД {forecast.BookmakerName}, {forecast.Over}. {ex.Message}");
+                Log.Logger.Error(ex, $"Не удалось получить ИСХОД {forecast.BookmakerName}, {forecast.Over}. {ex.Message}");
                 return null;
             }
         }
 
-        public double? GetKoeffStart(BookmakerGameKoeff? forecast)
+        public double? GetKoeffSecondOver(BookmakerGameKoeff? forecast) // второй
         {
-            if (forecast == null) return null;
+            if (forecast == null)
+                return null;
 
-            return (GetExodus(forecast) == 2) ? forecast.Over.First().Value : forecast.Under.First().Value;
+            if (forecast.Over.Count < 2)
+                return null;
+
+            return forecast.Over[1].Value;
         }
 
-        public double? GetKoeffSecond(BookmakerGameKoeff? forecast) // второй
+        public double? GetKoeffPenultimateOver(BookmakerGameKoeff? forecast) // предпоследний
         {
-            if (forecast == null) return null;
+            if (forecast == null)
+                return null;
 
-            if (GetExodus(forecast) == 2)
-            {
-                if (forecast.Over.Count <= 2)
-                    return null;
+            if (forecast.Over.Count <= 2)
+                return null;
 
-                return forecast.Over[1].Value;
-            }
-            else
-            {
-                if (forecast.Under.Count <= 2)
-                    return null;
-
-                return forecast.Under[1].Value;
-            }
+            var penultimateIndex = forecast.Over.Count - 2;
+            return forecast.Over[penultimateIndex].Value;
         }
 
-        public double? GetKoeffPenultimate(BookmakerGameKoeff? forecast) // предпоследний
+        public double? GetKoeffStartOver(BookmakerGameKoeff? forecast)
         {
-            if (forecast == null) return null;
+            if (forecast == null)
+                return null;
 
-            if (GetExodus(forecast) == 2)
-            {
-                if (forecast.Over.Count <= 2)
-                    return null;
+            if (!forecast.Over.Any())
+                return null;
 
-                var penultimateIndex = forecast.Over.Count - 2;
-                return forecast.Over[penultimateIndex].Value;
-            }
-            else
-            {
-                if (forecast.Under.Count <= 2)
-                    return null;
-
-                var penultimateIndex = forecast.Under.Count - 2;
-                return forecast.Under[penultimateIndex].Value;
-            }
+            return forecast?.Over.First().Value;
         }
 
-        public double? GetKoeffFinal(BookmakerGameKoeff? forecast)
+        public double? GetKoeffStartUnder(BookmakerGameKoeff? forecast)
+        {
+            if (forecast == null)
+                return null;
+
+            if (!forecast.Under.Any())
+                return null;
+
+            return forecast?.Under.First().Value;
+        }
+
+        /// <summary>
+        /// в поле Коэф ставим коэффициент перед матчем (то есть последний из истории),
+        /// который сыграл: если Исход = 2, то Over, если Исход = 0, то Under
+        /// </summary>
+        public double? GetKoeffFinalOver(BookmakerGameKoeff? forecast)
+        {
+            if (forecast == null)
+                return null;
+
+            if (!forecast.Over.Any())
+                return null;
+
+            return forecast?.Over.Last().Value;
+        }
+
+        public double? GetKoeffFinalUnder(BookmakerGameKoeff? forecast)
+        {
+            if (forecast == null)
+                return null;
+
+            if (!forecast.Under.Any())
+                return null;
+
+            return forecast?.Under.Last().Value;
+        }
+
+        /// <summary>
+        /// в поле Коэф ставим коэффициент перед матчем (то есть последний из истории),
+        /// который сыграл: если Исход = 2, то Over, если Исход = 0, то Under
+        /// </summary>
+        public double? GetKoeff(BookmakerGameKoeff? forecast)
         {
             if (forecast == null) return null;
+            return (GetExodus(forecast) == 2) ? GetKoeffFinalOver(forecast) : GetKoeffFinalUnder(forecast);
+        }
 
-            return (GetExodus(forecast) == 2) ? forecast.Over.Last().Value : forecast.Under.Last().Value;
+        /// <summary>
+        /// Возвращает тотал у которого меньший коэффициент (из Over и Under) ближе к 1.9, чем у других нецелых тоталов, кратный 0.5
+        /// </summary>
+        /// <param name="game"></param>
+        /// <returns></returns>
+        public double? GetCantralTotal()
+        {
+            var sortedForecasts = BookmakersRows
+                .OrderBy(f =>
+                {
+                    var diffOver = Math.Abs((GetKoeffFinalOver(f) ?? 0) - 1.9);
+                    var difUnder = Math.Abs((GetKoeffFinalUnder(f) ?? 0) - 1.9);
+                    return Math.Min(diffOver, difUnder);
+                });
+
+            var centralTotal = sortedForecasts
+                .Select(f => f.Total)
+                .Where(total => total % 1 == 0.5) // нецелый кратный 0.5
+                .FirstOrDefault(); // null если там например только целые тоталы
+
+            return centralTotal;
         }
 
         private BookmakerGameKoeff ReadBoolmakerRow(ChromeDriver driver, IWebElement block)
@@ -309,7 +375,7 @@ namespace BetsParserLib
                 bookmakerRow.Total = double.Parse(block.FindElement(By.ClassName("table-main__doubleparameter")).Text, CultureInfo.InvariantCulture);
                 debugStr += $"Total: {bookmakerRow.Total} ";
 
-                var overElement = block.FindElements(By.XPath(".//td[@data-odd]"))[0];
+                var overElement = block.FindElements(By.XPath(".//td[@data-odd]"))[0]; // содержит парамметр data-odd
                 bookmakerRow.Over = GetHistory(driver, overElement);
 
                 var underElement = block.FindElements(By.XPath(".//td[@data-odd]"))[1];
@@ -317,7 +383,7 @@ namespace BetsParserLib
             }
             catch (Exception ex)
             {
-                Log.Logger.Error($"Не удалось получить параметры {debugStr}. {ex.Message}");
+                Log.Logger.Error(ex, $"Не удалось получить параметры {debugStr}. {ex.Message}");
             }
 
             return bookmakerRow;
@@ -341,7 +407,7 @@ namespace BetsParserLib
             }
             catch (Exception ex)
             {
-                Log.Logger.Error($"Не удалось перейти на вкладку Over/Under. {ex.Message}");
+                Log.Logger.Error(ex, $"Не удалось перейти на вкладку Over/Under. {ex.Message}");
                 blocks = null;
             }
 
@@ -356,19 +422,18 @@ namespace BetsParserLib
             return null;
         }
 
-        private static string GetLeagueName(IWebElement leagueElement)
+        private static string? GetLeagueName(IWebElement leagueElement)
         {
-            var leagueName = string.Empty;
             try
             {
-                leagueName = leagueElement.FindElement(By.XPath(".//tr[1]/th[1]/a")).Text;
+                return leagueElement.FindElement(By.XPath(".//tr[1]/th[1]/a")).Text;
             }
             catch (Exception ex)
             {
-                Log.Logger.Error("Не удалось прочитать название лиги. " + ex.Message);
+                Log.Logger.Error(ex, "Не удалось прочитать название лиги. " + ex.Message);
             }
 
-            return leagueName;
+            return null;
         }
 
         private static Game ReadGame(DateTime date, string leagueName, IWebElement gameElement)
@@ -391,7 +456,7 @@ namespace BetsParserLib
             }
             catch (Exception ex)
             {
-                Log.Logger.Error($"Не удалось прочитать чать параметров матча: {debugStr}. " + ex.Message);
+                Log.Logger.Error(ex, $"Не удалось прочитать чать параметров матча: {debugStr}. " + ex.Message);
                 game = null;
             }
 

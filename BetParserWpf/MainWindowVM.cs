@@ -2,10 +2,10 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using OpenQA.Selenium.DevTools;
-using OpenQA.Selenium.DevTools.V117.Debugger;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -16,18 +16,72 @@ using System.Windows.Controls;
 
 namespace BetParserWpf
 {
+    public class StringWriterExt : StringWriter
+    {
+        [EditorBrowsable(EditorBrowsableState.Never)]
+        public delegate void FlushedEventHandler(object sender, EventArgs args);
+        public event FlushedEventHandler Flushed;
+        public virtual bool AutoFlush { get; set; }
+
+        public StringWriterExt()
+            : base() { }
+
+        public StringWriterExt(bool autoFlush)
+            : base() { this.AutoFlush = autoFlush; }
+
+        protected void OnFlush()
+        {
+            var eh = Flushed;
+            if (eh != null)
+                eh(this, EventArgs.Empty);
+        }
+
+        public override void Flush()
+        {
+            base.Flush();
+            OnFlush();
+        }
+
+        public override void Write(char value)
+        {
+            base.Write(value);
+            if (AutoFlush) Flush();
+        }
+
+        public override void Write(string value)
+        {
+            base.Write(value);
+            if (AutoFlush) Flush();
+        }
+
+        public override void Write(char[] buffer, int index, int count)
+        {
+            base.Write(buffer, index, count);
+            if (AutoFlush) Flush();
+        }
+    }
+
     internal partial class MainWindowVM : ObservableObject
     {
         public static string DirectoryNameHistory = "History";
         public static string DirectoryNameFiltered = "Filtered";
 
         private CancellationTokenSource _cancellationTokenSource;
+        private StringWriterExt _sw;
 
         public MainWindowVM()
         {
+            _sw = new StringWriterExt();
+            Console.SetOut(_sw);
+            Console.SetError(_sw);
+            _sw.Flushed += (s, a) => ConsoleOut = _sw.ToString();
+
             Date = DateTime.Now;
             ResetProgress();
         }
+
+        [ObservableProperty]
+        public string consoleOut;
 
         [ObservableProperty]
         public DateTime date;
@@ -121,7 +175,10 @@ namespace BetParserWpf
         public void Filter()
         {
             var games = BetsHelper.Deserialize($"{DirectoryNameHistory}\\{GetSaveFileName(Date)}");
-            var rows1 = BetsHelper.Translate1(games);
+            if (games == null)
+                return;
+
+            var rows1 = BetsHelper.GetFilteredRows(games);
 
             BetsHelper.WriteResultsCSV(rows1, $"{DirectoryNameFiltered}\\filtered_{GetFilteredFileName(Date)}");
             Process.Start("explorer.exe", $"{AppDomain.CurrentDomain.BaseDirectory}{DirectoryNameFiltered}");

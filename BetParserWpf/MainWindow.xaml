@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:BetParserWpf"
         mc:Ignorable="d"
-        Title="MainWindow" Height="275" Width="538">
+        Title="MainWindow" Height="475" Width="538">
     <Window.DataContext>
         <local:MainWindowVM/>
     </Window.DataContext>
@@ -17,6 +17,7 @@
             <RowDefinition Height="0.5*"/>
             <RowDefinition Height="0.7*"/>
             <RowDefinition Height="0.5*"/>
+            <RowDefinition Height="2*"/>
         </Grid.RowDefinitions>
 
         <DockPanel Grid.Row="0" Grid.Column="0" HorizontalAlignment="Center" VerticalAlignment="Center">
@@ -42,5 +43,10 @@
             <Button Margin="5" Command="{Binding ShowLoadedCommand}" Content="Посмотреть все загруженные" HorizontalAlignment="Center"/>
             <Button Margin="5" Command="{Binding FilterCommand}" Content="Показать отфильтрованные за этот день" HorizontalAlignment="Center"/>
         </StackPanel>
+
+        <ScrollViewer Margin="10,5,5,5" Grid.Row="3" Grid.Column="0" BorderBrush="Black" BorderThickness="1">
+            <TextBox IsReadOnly="True" Text="{Binding ConsoleOut}"/>
+        </ScrollViewer>
+
     </Grid>
 </Window>

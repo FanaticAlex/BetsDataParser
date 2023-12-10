@@ -7,6 +7,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BetsParserLib", "BetsParser
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BetParserWpf", "BetParserWpf\BetParserWpf.csproj", "{36336180-0A86-4B6E-8C91-87C84E917666}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BetParserLib.Tests", "BetParserLib.Tests\BetParserLib.Tests.csproj", "{BEDBA8C5-182E-4D8A-8E44-8E16D2A51D0F}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +23,10 @@ Global
 		{36336180-0A86-4B6E-8C91-87C84E917666}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{36336180-0A86-4B6E-8C91-87C84E917666}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{36336180-0A86-4B6E-8C91-87C84E917666}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BEDBA8C5-182E-4D8A-8E44-8E16D2A51D0F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BEDBA8C5-182E-4D8A-8E44-8E16D2A51D0F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BEDBA8C5-182E-4D8A-8E44-8E16D2A51D0F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BEDBA8C5-182E-4D8A-8E44-8E16D2A51D0F}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

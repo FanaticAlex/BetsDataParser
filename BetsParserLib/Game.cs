@@ -159,9 +159,14 @@ namespace BetsParserLib
 
         public List<HistoryRow> GetHistory(ChromeDriver driver, IWebElement overElement)
         {
+            var history = new List<HistoryRow>();
+
+            var koeffValue = 0.0;
             var displayedHistory = new List<IWebElement>();
             try
             {
+                koeffValue = double.Parse(overElement.GetAttribute("data-odd"));
+
                 Actions action = new Actions(driver);
                 action.MoveToElement(overElement).Perform(); // наводимся на элемент для показа истории
                 Thread.Sleep(100);
@@ -170,11 +175,11 @@ namespace BetsParserLib
             }
             catch(Exception ex )
             {
-                Log.Logger.Error(ex, $"Нет элеммента истории коэффициентов. {ex.Message}");
-                return new List<HistoryRow>(); ;
+                Log.Logger.Warning(ex, $"Нет элемента истории коэффициентов. берем только коэф из поля");
+                var row = new HistoryRow() { Date = null, Value = koeffValue, Difference = 0 };
+                return history;
             }
 
-            var history = new List<HistoryRow>();
             if (displayedHistory.Count() == 1) // история есть
             {
                 var historyBlock = displayedHistory.Single();
@@ -200,7 +205,7 @@ namespace BetsParserLib
                         }
                         catch(Exception ex)
                         {
-                            Log.Logger.Error(ex, $"Не удалось получить историю коээфициентов: {debugStr}. {ex.Message}");
+                            Log.Logger.Error(ex, $"Не удалось получить историю коээфициентов: {debugStr}.");
                         }
                     }
                 }
@@ -216,11 +221,12 @@ namespace BetsParserLib
                 }
                 catch(Exception ex)
                 {
-                    Log.Logger.Error(ex, $"Не удалось получить коэффициент без истории. {ex.Message}");
+                    Log.Logger.Error(ex, $"Не удалось получить коэффициент без истории.");
                 }
             }
 
-            return history.OrderBy(r => r.Date).ToList();
+            history.Reverse(); // переворачиваем сначала даты ранние потом поздние. Даты могут совпадать!! не делать OrderBy(date)
+            return history;
         }
 
         public int? GetExodus(BookmakerGameKoeff? forecast)
@@ -253,7 +259,7 @@ namespace BetsParserLib
             }
             catch(Exception ex)
             {
-                Log.Logger.Error(ex, $"Не удалось получить ИСХОД {forecast.BookmakerName}, {forecast.Over}. {ex.Message}");
+                Log.Logger.Error(ex, $"Не удалось получить ИСХОД {forecast.BookmakerName}, {forecast.Over}.");
                 return null;
             }
         }
@@ -383,7 +389,7 @@ namespace BetsParserLib
             }
             catch (Exception ex)
             {
-                Log.Logger.Error(ex, $"Не удалось получить параметры {debugStr}. {ex.Message}");
+                Log.Logger.Error(ex, $"Не удалось получить параметры {debugStr}.");
             }
 
             return bookmakerRow;
@@ -407,7 +413,7 @@ namespace BetsParserLib
             }
             catch (Exception ex)
             {
-                Log.Logger.Error(ex, $"Не удалось перейти на вкладку Over/Under. {ex.Message}");
+                Log.Logger.Error(ex, $"Не удалось перейти на вкладку Over/Under. ");
                 blocks = null;
             }
 
@@ -456,7 +462,7 @@ namespace BetsParserLib
             }
             catch (Exception ex)
             {
-                Log.Logger.Error(ex, $"Не удалось прочитать чать параметров матча: {debugStr}. " + ex.Message);
+                Log.Logger.Error(ex, $"Не удалось прочитать чать параметров матча: {debugStr}.");
                 game = null;
             }
 

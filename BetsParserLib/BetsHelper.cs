@@ -167,7 +167,9 @@ namespace BetsParserLib
         // находим ЦЕНТРАЛЬНЫЙ ТОТАЛ И ДВА СОСЕДНИХ +1 и -1
         public static Dictionary<double, List<BookmakerGameKoeff>> FilterBookmakersAndGroupByTotals(string bookmakerName, Game game)
         {
-            var selectedBookmakerRows = game.BookmakersRows.Where(row => row.BookmakerName == bookmakerName);
+            var selectedBookmakerRows = game.BookmakersRows
+                .Where(row => row.BookmakerName.ToLower() == bookmakerName.ToLower());
+
             var result = new Dictionary<double, List<BookmakerGameKoeff>>();
             var debugStr = string.Empty;
             try

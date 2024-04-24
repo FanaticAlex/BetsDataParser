@@ -8,17 +8,11 @@ using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Collections.ObjectModel;
 using Serilog.Core;
+using OpenQA.Selenium.Firefox;
+using System.Xml.Linq;
 
 namespace BetsParserLib
 {
-    public class LoadingProgress
-    {
-        public int GamesLoaded { get; set; }
-        public int GamesCount { get; set; }
-        public int ForecastsLoaded { get; set; }
-        public int ForecastsCount { get; set; }
-        public string LoadingObjectName { get; set; }
-    }
 
     public class Game
     {
@@ -63,14 +57,25 @@ namespace BetsParserLib
                     .WriteTo.File(path: $"logs\\Log.txt", rollingInterval: RollingInterval.Day)
                     .CreateLogger();
 
-            var chromeOptions = new ChromeOptions();
-            chromeOptions.AddArguments("headless");
+            var options = new ChromeOptions();
+            options.AddArgument("--ignore-certificate-errors");
+            options.AddArgument("--allow-running-insecure-content");
+            options.AcceptInsecureCertificates = true;
+            options.AddArguments("headless");
+            //options.SetPreference("permissions.default.image", 2); // отключить картинки Firefox
+            options.AddArgument("--blink-settings=imagesEnabled=false"); // отключить картинки Chrome
+
             var CurrentProgress = new LoadingProgress();
 
             Log.Logger.Information($"Начинаем парсить игры на дату: {date.ToString("d")}");
 
-            using (var driver = new ChromeDriver(chromeOptions))
+            using (var driver = new ChromeDriver(options))
             {
+                // настройки задержки
+                //driver.Manage().Timeouts().AsynchronousJavaScript = TimeSpan.FromSeconds(180);
+                //driver.Manage().Timeouts().PageLoad = TimeSpan.FromSeconds(180);
+                //driver.Manage().Timeouts().ImplicitWait = TimeSpan.FromSeconds(180);
+
                 LoadGamesList(date, progress, CurrentProgress, driver);
                 CloseCookiesWindow(driver);
                 ReadOnlyCollection<IWebElement> leaguesElements = GetLeaguesRowsElements(driver);
@@ -79,7 +84,7 @@ namespace BetsParserLib
                 var games = new List<Game>();
                 foreach (var leagueElement in leaguesElements)
                 {
-                    string leagueName = GetLeagueName(leagueElement);
+                    var leagueName = GetLeagueName(leagueElement);
                     if (leagueName == null)
                     {
                         Log.Logger.Information($"Пропускаем строку, тк лига не найдена");
@@ -130,7 +135,7 @@ namespace BetsParserLib
         }
 
         public List<BookmakerGameKoeff> GetBookmakersRows(
-            ChromeDriver driver, Game game, IProgress<LoadingProgress> progress, LoadingProgress currentProgress, CancellationToken token)
+            WebDriver driver, Game game, IProgress<LoadingProgress> progress, LoadingProgress currentProgress, CancellationToken token)
         {
             driver.Url = game.Reference;
 
@@ -146,7 +151,6 @@ namespace BetsParserLib
 
                 var block = bookmakersElements[i];
                 BookmakerGameKoeff bookmakerRow = ReadBoolmakerRow(driver, block);
-
                 bookmakersRows.Add(bookmakerRow);
 
                 currentProgress.ForecastsLoaded = (i + 1);
@@ -157,7 +161,7 @@ namespace BetsParserLib
             return bookmakersRows;
         }
 
-        public List<HistoryRow> GetHistory(ChromeDriver driver, IWebElement overElement)
+        public List<HistoryRow> GetHistory(WebDriver driver, IWebElement element)
         {
             var history = new List<HistoryRow>();
 
@@ -165,11 +169,14 @@ namespace BetsParserLib
             var displayedHistory = new List<IWebElement>();
             try
             {
-                koeffValue = double.Parse(overElement.GetAttribute("data-odd"));
+                koeffValue = double.Parse(element.GetAttribute("data-odd"));
 
+                ((IJavaScriptExecutor)driver).ExecuteScript("arguments[0].scrollIntoView(true);", element);
                 Actions action = new Actions(driver);
-                action.MoveToElement(overElement).Perform(); // наводимся на элемент для показа истории
+                action.MoveToElement(element).Perform(); // наводимся на элемент для показа истории
+
                 Thread.Sleep(100);
+
                 var aodds = driver.FindElement(By.XPath("//*[@id='aodds-desktop']"));
                 displayedHistory = aodds.FindElements(By.XPath(".//tbody[contains(@id, 'aodds')]")).Where(e => e.Displayed).ToList();
             }
@@ -216,7 +223,7 @@ namespace BetsParserLib
                 {
                     var singleHistoryRow = new HistoryRow();
                     singleHistoryRow.Date = null;
-                    singleHistoryRow.Value = double.Parse(overElement.FindElement(By.XPath(".//span[text()]")).Text, CultureInfo.InvariantCulture);
+                    singleHistoryRow.Value = double.Parse(element.FindElement(By.XPath(".//span[text()]")).Text, CultureInfo.InvariantCulture);
                     history.Add(singleHistoryRow);
                 }
                 catch(Exception ex)
@@ -368,7 +375,7 @@ namespace BetsParserLib
             return centralTotal;
         }
 
-        private BookmakerGameKoeff ReadBoolmakerRow(ChromeDriver driver, IWebElement block)
+        private BookmakerGameKoeff ReadBoolmakerRow(WebDriver driver, IWebElement block)
         {
             var bookmakerRow = new BookmakerGameKoeff();
             var debugStr = string.Empty;
@@ -395,7 +402,7 @@ namespace BetsParserLib
             return bookmakerRow;
         }
 
-        private static List<IWebElement> GetBookmakersElements(ChromeDriver driver)
+        private static List<IWebElement> GetBookmakersElements(WebDriver driver)
         {
             List<IWebElement> blocks = null;
             try
@@ -469,23 +476,23 @@ namespace BetsParserLib
             return game;
         }
 
-        private static void LoadGamesList(DateTime date, IProgress<LoadingProgress> progress, LoadingProgress CurrentProgress, ChromeDriver driver)
+        private static void LoadGamesList(DateTime date, IProgress<LoadingProgress> progress, LoadingProgress CurrentProgress, WebDriver driver)
         {
-            var gamePageUrl = $"https://www.betexplorer.com/hockey/results/?year=2023&month={date.Month}&day={date.Day}";
+            var gamePageUrl = $"https://www.betexplorer.com/hockey/results/?year={date.Year}&month={date.Month}&day={date.Day}";
             driver.Url = gamePageUrl;
             CurrentProgress.LoadingObjectName = "Загрузка списка игр...";
             progress.Report(CurrentProgress);
             Thread.Sleep(1000); // ожидание окончания загрузки страницы!
         }
 
-        private static ReadOnlyCollection<IWebElement> GetLeaguesRowsElements(ChromeDriver driver)
+        private static ReadOnlyCollection<IWebElement> GetLeaguesRowsElements(WebDriver driver)
         {
             IWebElement rootTable = driver.FindElement(By.XPath("//*[@id=\"nr-all\"]/div[3]/div/table"));
             var children = rootTable.FindElements(By.XPath(".//tbody")); // получаем список игр
             return children;
         }
 
-        private static void CloseCookiesWindow(ChromeDriver driver)
+        private static void CloseCookiesWindow(WebDriver driver)
         {
             var acceptCookiesBtn = driver.FindElement(By.XPath("//*[@id='onetrust-accept-btn-handler']"));
             acceptCookiesBtn.Click(); // закрываем окно кукесов

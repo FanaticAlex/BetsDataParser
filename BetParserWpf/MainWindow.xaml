@@ -5,29 +5,41 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:BetParserWpf"
         mc:Ignorable="d"
-        Title="MainWindow" Height="475" Width="538">
+        Title="BetHelper" Height="651" Width="776">
     <Window.DataContext>
         <local:MainWindowVM/>
     </Window.DataContext>
-    <Grid>
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition/>
-        </Grid.ColumnDefinitions>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="0.5*"/>
-            <RowDefinition Height="0.7*"/>
-            <RowDefinition Height="0.5*"/>
-            <RowDefinition Height="2*"/>
-        </Grid.RowDefinitions>
+    <DockPanel VerticalAlignment="Stretch">
 
-        <DockPanel Grid.Row="0" Grid.Column="0" HorizontalAlignment="Center" VerticalAlignment="Center">
-            <DatePicker Margin="10" SelectedDate="{Binding Date}" SelectedDateChanged="DatePicker_SelectedDateChanged"/>
-            <CheckBox Margin="10" VerticalAlignment="Center" IsEnabled="False" IsChecked="{Binding IsLoaded}" Content="Уже загружено"/>
-            <Button Margin="10" Command="{Binding StartLoadCommand}" Content="Начать загрузку"/>
-            <Button Margin="10" Command="{Binding SotopLoadCommand}" Content="Остановить загрузку"/>
+        <DockPanel DockPanel.Dock="Top">
+            <Calendar Name="Claendar1" Margin="10" SelectedDate="{Binding Date}" DisplayModeChanged="Claendar1_DisplayModeChanged" SelectionMode="MultipleRange"/>
+            <DockPanel>
+                <TextBlock DockPanel.Dock="Top" TextWrapping="Wrap" FontSize="12" >Для того чтобы получать расылку найдите чат бот по имени и отправте ему любое сообщение.</TextBlock>
+                <Label DockPanel.Dock="Top" Grid.Row="1" Name="NameLabel" FontSize="14" >НАЗВАНИЕ ЧАТ БОТА:</Label>
+                <Button DockPanel.Dock="Top" Width="300" Height="20" Command="{Binding SendNewsCommand}" Content="Сделать рассылку за выбранный день"/>
+                <Label DockPanel.Dock="Top" Content="Время до следующей автоматической отправки рассылки:"/>
+                <Label DockPanel.Dock="Top" Grid.Row="2" >СПИСОК ПОЛЬЗОВАТЕЛЕЙ ДЛЯ РАССЫЛКИ:</Label>
+                <ListBox DockPanel.Dock="Top" Margin="10" Grid.Row="3" ItemsSource="{Binding Users}">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <DockPanel>
+                                <TextBox Text="{Binding Name}" />
+                                <TextBox Text=" : " />
+                                <TextBox Text="{Binding Id}" />
+                            </DockPanel>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </DockPanel>
         </DockPanel>
 
-        <StackPanel Grid.Row="1" Grid.Column="0" VerticalAlignment="Center">
+        <DockPanel DockPanel.Dock="Top" HorizontalAlignment="Center" VerticalAlignment="Center">
+            <DatePicker Margin="10" SelectedDate="{Binding Date}"/>
+            <Button Margin="10" Command="{Binding StartLoadCommand}" Content="Начать загрузку"/>
+            <Button Margin="10" Command="{Binding StopLoadCommand}" Content="Остановить загрузку"/>
+        </DockPanel>
+
+        <StackPanel DockPanel.Dock="Top" VerticalAlignment="Center">
             <DockPanel HorizontalAlignment="Center">
                 <Label Width="200" Margin="1" Content="{Binding ProgressGamesText}"/>
                 <ProgressBar Margin="1" Width="200" Height="20" Minimum="0" Maximum="100" Value="{Binding ProgressGame}" />
@@ -39,14 +51,14 @@
             <Label BorderBrush="Black" Width="300" Height="30"  Margin="1" Content="{Binding LoadingObject}"/>
         </StackPanel>
 
-        <StackPanel Grid.Row="2" Grid.Column="0">
+        <StackPanel DockPanel.Dock="Top">
             <Button Margin="5" Command="{Binding ShowLoadedCommand}" Content="Посмотреть все загруженные" HorizontalAlignment="Center"/>
             <Button Margin="5" Command="{Binding FilterCommand}" Content="Показать отфильтрованные за этот день" HorizontalAlignment="Center"/>
         </StackPanel>
 
-        <ScrollViewer Margin="10,5,5,5" Grid.Row="3" Grid.Column="0" BorderBrush="Black" BorderThickness="1">
+        <ScrollViewer DockPanel.Dock="Top" Margin="10,5,5,5" BorderBrush="Black" BorderThickness="1">
             <TextBox IsReadOnly="True" Text="{Binding ConsoleOut}"/>
         </ScrollViewer>
 
-    </Grid>
+    </DockPanel>
 </Window>

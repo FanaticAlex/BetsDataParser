@@ -11,6 +11,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BetParserLib.Tests", "BetPa
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BetParser.TelegramBot", "BetParser.TelegramBot\BetParser.TelegramBot.csproj", "{615E50E5-C657-4BF4-89C7-D40D05F318DE}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StrategyGenerator.Console", "StrategyGenerator.Console\StrategyGenerator.Console.csproj", "{8AB50D85-9008-4956-905D-157F75CA5BE3}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -33,6 +35,10 @@ Global
 		{615E50E5-C657-4BF4-89C7-D40D05F318DE}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{615E50E5-C657-4BF4-89C7-D40D05F318DE}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{615E50E5-C657-4BF4-89C7-D40D05F318DE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8AB50D85-9008-4956-905D-157F75CA5BE3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8AB50D85-9008-4956-905D-157F75CA5BE3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8AB50D85-9008-4956-905D-157F75CA5BE3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8AB50D85-9008-4956-905D-157F75CA5BE3}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

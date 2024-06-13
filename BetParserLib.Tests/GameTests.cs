@@ -1,5 +1,4 @@
 using BetsParserLib;
-using OpenQA.Selenium.DevTools.V118.Debugger;
 
 namespace BetParserLib.Tests
 {

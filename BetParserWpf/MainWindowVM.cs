@@ -14,7 +14,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
-using BetParserWpf.TelegramBot;
+using BetParser.TelegramBot;
 
 namespace BetParserWpf
 {
@@ -72,7 +72,7 @@ namespace BetParserWpf
             if (games == null)
                 MessageBox.Show("Нет загруженных игр за этот день");
 
-            bot.SendNews(games);
+            bot.SendNews(games.Select(g => g.Reference));
         }
 
         [RelayCommand]

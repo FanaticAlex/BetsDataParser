@@ -9,7 +9,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BetParserWpf", "BetParserWp
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BetParserLib.Tests", "BetParserLib.Tests\BetParserLib.Tests.csproj", "{BEDBA8C5-182E-4D8A-8E44-8E16D2A51D0F}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BetParserTelegramBot", "BetParserTelegramBot\BetParserTelegramBot.csproj", "{1E8107D0-410B-426A-A939-3ABC2B971E79}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BetParser.TelegramBot", "BetParser.TelegramBot\BetParser.TelegramBot.csproj", "{615E50E5-C657-4BF4-89C7-D40D05F318DE}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -29,10 +29,10 @@ Global
 		{BEDBA8C5-182E-4D8A-8E44-8E16D2A51D0F}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{BEDBA8C5-182E-4D8A-8E44-8E16D2A51D0F}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{BEDBA8C5-182E-4D8A-8E44-8E16D2A51D0F}.Release|Any CPU.Build.0 = Release|Any CPU
-		{1E8107D0-410B-426A-A939-3ABC2B971E79}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{1E8107D0-410B-426A-A939-3ABC2B971E79}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{1E8107D0-410B-426A-A939-3ABC2B971E79}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{1E8107D0-410B-426A-A939-3ABC2B971E79}.Release|Any CPU.Build.0 = Release|Any CPU
+		{615E50E5-C657-4BF4-89C7-D40D05F318DE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{615E50E5-C657-4BF4-89C7-D40D05F318DE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{615E50E5-C657-4BF4-89C7-D40D05F318DE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{615E50E5-C657-4BF4-89C7-D40D05F318DE}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

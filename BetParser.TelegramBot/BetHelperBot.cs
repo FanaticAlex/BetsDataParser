@@ -10,12 +10,10 @@ using Telegram.Bot.Polling;
 using Telegram.Bot.Types.Enums;
 using Telegram.Bot.Types;
 using System.Windows;
-using BetsParserLib;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 
-namespace BetParserWpf.TelegramBot
+namespace BetParser.TelegramBot
 {
-    internal class BetHelperBot
+    public class BetHelperBot
     {
         public static readonly UserManager userManager = new UserManager();
         public static readonly string BotName = "BetHelperBot";
@@ -70,13 +68,11 @@ namespace BetParserWpf.TelegramBot
             return Task.CompletedTask;
         }
 
-        public void SendNews(List<BetsParserLib.Game> games)
+        public void SendNews(IEnumerable<string> messages)
         {
             foreach (var user in userManager.Users)
-                foreach(var game in games)
-                 bot.SendTextMessageAsync(user.Id, game.Reference);
-
-            MessageBox.Show("Сообщение отправлено");
+                foreach(var message in messages)
+                 bot.SendTextMessageAsync(user.Id, message);
         }
     }
 }

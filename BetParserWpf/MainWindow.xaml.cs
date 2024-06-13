@@ -2,8 +2,7 @@
 using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
-
-using BetParserWpf.TelegramBot;
+using BetParser.TelegramBot;
 
 namespace BetParserWpf
 {

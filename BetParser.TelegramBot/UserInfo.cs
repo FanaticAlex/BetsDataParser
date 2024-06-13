@@ -1,6 +1,6 @@
 ﻿using Newtonsoft.Json.Serialization;
 
-namespace BetParserTelegramBot
+namespace BetParser.TelegramBot
 {
     public class UserInfo(long id, string name)
     {

@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 
-namespace BetParserWpf.TelegramBot
+namespace BetParser.TelegramBot
 {
     public class UserManager
     {

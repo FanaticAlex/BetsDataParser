@@ -29,6 +29,10 @@ namespace BetsParserLib
         /// </summary>
         public string Date { get; set; }
         /// <summary>
+        /// Время игры
+        /// </summary>
+        public string Time { get; set; }
+        /// <summary>
         /// Результат игры
         /// </summary>
         public string Result { get; set; }
@@ -60,6 +64,7 @@ namespace BetsParserLib
             var options = new ChromeOptions();
             options.AddArgument("--ignore-certificate-errors");
             options.AddArgument("--allow-running-insecure-content");
+            options.AddArgument("--disable-search-engine-choice-screen");
             options.AcceptInsecureCertificates = true;
             options.AddArguments("headless");
             //options.SetPreference("permissions.default.image", 2); // отключить картинки Firefox
@@ -463,6 +468,8 @@ namespace BetsParserLib
                 debugStr += $"Result {game.Result} ";
                 game.Reference = mainElement?.FindElement(By.XPath(".//a")).GetAttribute("href");
                 debugStr += $"Reference {game.Reference} ";
+                game.Time = mainElement?.FindElement(By.ClassName("table-main__time")).Text;
+                debugStr += $"Reference {game.Time} ";
 
                 game.Date = date.ToString("d");
                 game.LeagueName = leagueName;
